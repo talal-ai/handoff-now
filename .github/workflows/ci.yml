@@ -38,6 +38,8 @@ jobs:
           jq empty hooks/hooks.json
           jq empty schemas/config.schema.json
           jq empty schemas/session.schema.json
+      - name: Lint shell scripts
+        run: shellcheck scripts/bootstrap.sh scripts/hook-dispatch.sh
       - name: Reject accidental secrets
         uses: gitleaks/gitleaks-action@v2
         env:

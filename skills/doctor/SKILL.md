@@ -4,4 +4,4 @@ description: Diagnose handoff-now installation, configuration, Git, status-line,
 allowed-tools: Bash
 ---
 
-Run `handoff-now doctor`. Explain failed checks and use `/handoff-now:setup` for repair. Never print API keys or credential values.
+Run `handoff-now doctor`. Explain failed checks and use `/handoff-now:setup` for repair — it now fetches and verifies the native engine automatically if it's missing, no manual build required. Never print API keys or credential values.
