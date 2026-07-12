@@ -15,28 +15,27 @@
 
 **The recovery guarantee never depends on another model request.**
 
-## Install from source
-
-This is the supported early-access path until the signed native binaries are published:
-
-```powershell
-git clone https://github.com/talal-ai/handoff-now
-cd handoff-now
-cargo build --release
-./target/release/handoff-now.exe setup
-claude --plugin-dir .
-```
-
-On macOS, replace `handoff-now.exe` with `handoff-now`. Inside Claude, run `/handoff-now:doctor`.
-
-## Marketplace registration
+## Install
 
 ```text
 /plugin marketplace add https://github.com/talal-ai/handoff-now
 /plugin install handoff-now@handoff-now-marketplace
 ```
 
-The marketplace installs the Claude plugin bundle. During early access, build and set up the native engine using the source instructions above. The one-command bootstrap will become the default after the release binaries are signed and notarized.
+That's it. The first time Claude Code starts with the plugin installed, it
+automatically downloads the correct native engine for your OS/CPU, verifies
+its SHA-256 checksum against the published `SHA256SUMS`, and installs it in
+the background — no Rust, no manual build, no separate download step.
+Restart Claude Code once after the first install so the status-line trust
+prompt and hooks load consistently, then run `/handoff-now:doctor` to
+confirm it's healthy.
+
+The release binaries are not code-signed (that costs money and isn't
+required to run them). On first execution, macOS or Windows may show a
+one-time "unknown publisher" warning — this is normal for unsigned
+open-source tools and only appears once. Click through it
+("More info → Run anyway" on Windows) and it won't reappear. If you'd rather
+verify the binary yourself first, see [Development](#development) below.
 
 ## Why this exists
 
@@ -76,24 +75,11 @@ Every project gets `.handoff-now/<session-id>/` with:
 
 - Claude Code 2.1.206 or newer is recommended.
 - Windows 10/11 x64 or ARM64, or macOS 13+ Intel/Apple Silicon.
+- Internet access on first run, to download the native engine once.
 - Git is optional but recommended.
 - `ANTHROPIC_API_KEY` is optional. It enables an isolated Haiku API summary; never store it in `config.json`.
 
-## Development checkout
-
-```powershell
-git clone https://github.com/talal-ai/handoff-now
-cd handoff-now
-cargo build --release
-./target/release/handoff-now.exe setup
-claude --plugin-dir .
-```
-
-On macOS, replace `handoff-now.exe` with `handoff-now`.
-
-Inside Claude Code or Desktop, run `/handoff-now:doctor`. Restart Claude after the first setup so the status-line trust prompt and hooks load consistently.
-
-The setup command preserves and chains an existing status line, creates a timestamped settings backup, and installs a stable watcher under `~/.claude/handoff-now/`.
+The `setup` step preserves and chains an existing status line, creates a timestamped settings backup, and installs a stable watcher under `~/.claude/handoff-now/`.
 
 ## Commands
 
@@ -150,6 +136,22 @@ The plugin is in early public release. Windows x64/ARM64 and macOS Intel/Apple S
 If Handoff Now successfully saves a real task, share the recovery scenario in [Discussions](https://github.com/talal-ai/handoff-now/discussions). Those reports guide the roadmap.
 
 ## Development
+
+To build and run from source instead of the marketplace install — useful for
+contributors, or if you'd rather verify the binary yourself before trusting
+it:
+
+```powershell
+git clone https://github.com/talal-ai/handoff-now
+cd handoff-now
+cargo build --release
+./target/release/handoff-now.exe setup
+claude --plugin-dir .
+```
+
+On macOS, replace `handoff-now.exe` with `handoff-now`. Inside Claude, run `/handoff-now:doctor`.
+
+Before submitting changes:
 
 ```text
 cargo fmt --check
