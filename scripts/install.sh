@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
-repository="${HANDOFF_NOW_REPOSITORY:-handoff-now/handoff-now}"
+repository="${HANDOFF_NOW_REPOSITORY:-YOUR-GITHUB-OWNER/handoff-now}"
 version="${HANDOFF_NOW_VERSION:-latest}"
+[ "$repository" != "YOUR-GITHUB-OWNER/handoff-now" ] || { echo "Set HANDOFF_NOW_REPOSITORY=OWNER/handoff-now after publishing." >&2; exit 2; }
 case "$(uname -m)" in
   arm64|aarch64) target="aarch64-apple-darwin" ;;
   x86_64) target="x86_64-apple-darwin" ;;

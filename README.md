@@ -25,7 +25,7 @@ Claude Code reports usage only after an API response. No plugin can reliably int
 ## Local development install
 
 ```powershell
-git clone https://github.com/handoff-now/handoff-now
+git clone https://github.com/YOUR-GITHUB-OWNER/handoff-now
 cd handoff-now
 cargo build --release
 ./target/release/handoff-now.exe setup
@@ -39,7 +39,7 @@ Inside Claude Code or Desktop, run `/handoff-now:doctor`. Restart Claude after t
 ## Marketplace install
 
 ```text
-/plugin marketplace add https://github.com/handoff-now/handoff-now
+/plugin marketplace add https://github.com/YOUR-GITHUB-OWNER/handoff-now
 /plugin install handoff-now@handoff-now-marketplace
 /handoff-now:setup
 ```
