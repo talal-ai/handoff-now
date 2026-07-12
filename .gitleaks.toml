@@ -1,0 +1,5 @@
+[allowlist]
+description = "Public Anthropic model identifiers are not credentials."
+regexes = [
+  '''claude-haiku-4-5-20251001''',
+]
