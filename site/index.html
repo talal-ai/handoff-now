@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Handoff Now — Claude Code usage-limit recovery plugin</title>
+  <meta name="description" content="Never lose a Claude Code task to the 5-hour usage limit. Handoff Now checkpoints early, freezes risky edits, and creates a verified local resume package.">
+  <meta name="keywords" content="Claude Code usage limit, Claude Code handoff, Claude Code session recovery, Claude Code plugin, five hour limit">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://talal-ai.github.io/handoff-now/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Handoff Now — never lose a Claude Code session">
+  <meta property="og:description" content="Quota-aware, crash-safe recovery for Claude Code and Desktop.">
+  <meta property="og:url" content="https://talal-ai.github.io/handoff-now/">
+  <meta property="og:image" content="https://talal-ai.github.io/handoff-now/social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Handoff Now","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS","isAccessibleForFree":true,"license":"https://www.apache.org/licenses/LICENSE-2.0","codeRepository":"https://github.com/talal-ai/handoff-now","description":"Quota-aware, crash-safe recovery plugin for Claude Code and Desktop."}</script>
+</head>
+<body>
+  <header class="hero">
+    <nav><a class="brand" href="./"><img src="logo.svg" alt=""> Handoff Now</a><a href="https://github.com/talal-ai/handoff-now">GitHub ↗</a></nav>
+    <div class="hero-grid">
+      <section>
+        <p class="eyebrow">CLAUDE CODE SAFETY NET</p>
+        <h1>Never lose a long coding session to the usage limit.</h1>
+        <p class="lead">Handoff Now checkpoints early, freezes risky work before exhaustion, and creates a verified local package that your next session can resume.</p>
+        <div class="actions"><a class="primary" href="https://github.com/talal-ai/handoff-now#install-from-source">Install early access</a><a href="https://github.com/talal-ai/handoff-now#how-it-works">How it works</a></div>
+      </section>
+      <div class="terminal" aria-label="Example Handoff Now status">
+        <div><i></i><i></i><i></i></div>
+        <pre><span>$</span> /handoff-now:status
+
+5-hour usage     91%
+state            HANDOFF_REQUIRED
+source writes    BLOCKED
+
+✓ journal committed
+✓ Git diff captured
+✓ secrets redacted
+✓ integrity verified
+
+HANDOFF.md is ready.</pre>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section id="how-it-works"><p class="eyebrow">HOW IT WORKS</p><h2>Recovery before the cliff.</h2><div class="cards"><article><b>85%</b><h3>Prepare</h3><p>Create a deterministic checkpoint while normal work continues.</p></article><article><b>90%</b><h3>Protect</h3><p>Finish the active boundary, block new source mutations, and finalize.</p></article><article><b>95%</b><h3>Stop safely</h3><p>Make no recovery-dependent model request. Hand off verified local facts.</p></article></div></section>
+    <section class="promise"><h2>No API key required. No private endpoint. No recovery theater.</h2><p>The append-only journal and deterministic artifact generator are the recovery guarantee. Optional Haiku summaries can improve readability, but model failure cannot erase the handoff.</p></section>
+    <section><p class="eyebrow">EARLY ACCESS</p><h2>Build the native engine, then load the plugin.</h2><pre class="install">git clone https://github.com/talal-ai/handoff-now
+cd handoff-now
+cargo build --release
+./target/release/handoff-now setup
+claude --plugin-dir .</pre><p>The marketplace bundle is available now. One-command native installers will become the default after platform signing and notarization.</p></section>
+  </main>
+  <footer>Apache-2.0 · Local-first · Telemetry off by default · <a href="https://github.com/talal-ai/handoff-now">Source and security model</a></footer>
+</body>
+</html>

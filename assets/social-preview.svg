@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Handoff Now — never lose a Claude Code session to the usage limit</title>
+  <desc id="desc">Product banner showing a protected handoff before quota exhaustion.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#17113A"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="95" y1="119" x2="366" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" rx="32" fill="url(#bg)"/>
+  <circle cx="1130" cy="80" r="260" fill="#7C3AED" opacity=".13"/>
+  <circle cx="90" cy="620" r="290" fill="#2563EB" opacity=".10"/>
+  <path fill="url(#shield)" d="m236 106 148 55v108c0 95-56 160-148 194-92-34-148-99-148-194V161l148-55Z"/>
+  <path fill="#fff" d="M151 220h111v-38l75 72-75 72v-38H151v-68Z"/>
+  <circle cx="154" cy="374" r="25" fill="#A7F3D0"/>
+  <path d="m143 374 9 10 19-23" fill="none" stroke="#065F46" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="470" y="215" fill="#C4B5FD" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" letter-spacing="3">CLAUDE CODE SAFETY NET</text>
+  <text x="470" y="310" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="800">HANDOFF NOW</text>
+  <text x="470" y="382" fill="#D7DCEA" font-family="Arial, Helvetica, sans-serif" font-size="34">Never lose a long coding session</text>
+  <text x="470" y="430" fill="#D7DCEA" font-family="Arial, Helvetica, sans-serif" font-size="34">to the 5-hour usage limit.</text>
+  <rect x="470" y="487" width="620" height="62" rx="14" fill="#111827" stroke="#6D5CE7" stroke-width="2"/>
+  <text x="500" y="528" fill="#A7F3D0" font-family="Consolas, Menlo, monospace" font-size="25">90% → freeze → verify → resume</text>
+</svg>

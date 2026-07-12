@@ -1,24 +1,54 @@
 name: Bug report
-description: Report a reproducible non-security issue
+description: Report a reproducible Handoff Now problem.
+title: "bug: "
+labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: Do not include transcripts, handoff contents, API keys, or other secrets. Use a private security advisory for security issues.
+      value: "Do not paste raw transcripts, API keys, tokens, or private source code. Run `/handoff-now:doctor` and redact its output before sharing."
   - type: input
     id: version
-    attributes: { label: handoff-now version }
-    validations: { required: true }
-  - type: input
-    id: claude
-    attributes: { label: Claude Code/Desktop version }
-    validations: { required: true }
+    attributes:
+      label: Handoff Now version
+      placeholder: v0.1.0
+    validations:
+      required: true
   - type: dropdown
     id: platform
     attributes:
       label: Platform
-      options: [Windows x64, Windows ARM64, macOS Intel, macOS Apple Silicon]
-    validations: { required: true }
+      options: [Windows x64, Windows ARM64, macOS Intel, macOS Apple Silicon, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Claude surface
+      options: [Claude Code CLI, Claude Desktop local session, Claude Desktop SSH session]
+    validations:
+      required: true
   - type: textarea
-    id: reproduction
-    attributes: { label: Redacted reproduction steps }
-    validations: { required: true }
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: Tell us exactly what happened and which command or usage band was active.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed credentials, private source, and raw transcript content.
+          required: true
