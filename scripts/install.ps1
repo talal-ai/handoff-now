@@ -1,9 +1,8 @@
 param(
-  [string]$Repository = "YOUR-GITHUB-OWNER/handoff-now",
+  [string]$Repository = "talal-ai/handoff-now",
   [string]$Version = "latest"
 )
 $ErrorActionPreference = "Stop"
-if ($Repository -like 'YOUR-GITHUB-OWNER/*') { throw 'Pass -Repository OWNER/handoff-now after publishing the GitHub repository.' }
 $arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) {
   "Arm64" { "aarch64-pc-windows-msvc" }
   "X64" { "x86_64-pc-windows-msvc" }

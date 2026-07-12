@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/YOUR-GITHUB-OWNER/handoff-now/schemas/session.schema.json",
+  "$id": "https://github.com/talal-ai/handoff-now/schemas/session.schema.json",
   "title": "handoff-now session state",
   "type": "object",
   "required": ["schemaVersion", "sessionId", "cwd", "phase", "journalSequence", "updatedAt"],

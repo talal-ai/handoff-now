@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/YOUR-GITHUB-OWNER/handoff-now/schemas/config.schema.json",
+  "$id": "https://github.com/talal-ai/handoff-now/schemas/config.schema.json",
   "title": "handoff-now configuration",
   "type": "object",
   "additionalProperties": false,

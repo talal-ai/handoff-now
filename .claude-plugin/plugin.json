@@ -5,6 +5,8 @@
   "author": {
     "name": "handoff-now contributors"
   },
+  "homepage": "https://github.com/talal-ai/handoff-now",
+  "repository": "https://github.com/talal-ai/handoff-now",
   "license": "Apache-2.0",
   "keywords": ["handoff", "recovery", "usage", "quota", "continuity"]
 }
