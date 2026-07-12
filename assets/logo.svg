@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Handoff Now logo</title>
+  <desc id="desc">A shield containing a forward handoff arrow and checkpoint.</desc>
+  <defs>
+    <linearGradient id="g" x1="18" y1="14" x2="108" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#g)" d="M64 6 112 24v35c0 31-18 52-48 63C34 111 16 90 16 59V24L64 6Z"/>
+  <path fill="#fff" d="M37 43h36V31l24 23-24 23V65H37V43Z"/>
+  <circle cx="38" cy="91" r="8" fill="#A7F3D0"/>
+  <path d="m34 91 3 3 6-7" fill="none" stroke="#065F46" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

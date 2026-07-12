@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://talal-ai.github.io/handoff-now/sitemap.xml

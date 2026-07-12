@@ -1,7 +1,7 @@
 {
   "name": "handoff-now-marketplace",
   "owner": {
-    "name": "handoff-now contributors"
+    "name": "talal-ai"
   },
   "metadata": {
     "description": "Production recovery tools for Claude Code"
@@ -13,7 +13,7 @@
       "description": "Quota-aware, crash-safe handoff packages for Claude Code and Desktop.",
       "version": "0.1.0",
       "category": "productivity",
-      "tags": ["handoff", "recovery", "quota"]
+      "tags": ["claude-code", "handoff", "session-recovery", "usage-limit", "quota"]
     }
   ]
 }

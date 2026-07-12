@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a recovery, safety, or handoff improvement.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What failure or workflow pain should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Where does it matter?
+      options: [Quota recovery, Crash recovery, Resume quality, Privacy/security, Installation, Team policy, Other]
+    validations:
+      required: true
