@@ -301,7 +301,7 @@ fn handoff_markdown(
     out: &Path,
 ) -> String {
     let latest_user =
-        latest_section(history, "## User").unwrap_or("Not recoverable from transcript.");
+        latest_real_user_message(history).unwrap_or("Not recoverable from transcript.");
     format!(
         r#"# Handoff Now
 
@@ -379,11 +379,38 @@ Run `git status --short --branch`, compare it with `git-status.txt`, then read `
     )
 }
 
-fn latest_section<'a>(text: &'a str, heading: &str) -> Option<&'a str> {
-    let start = text.rfind(heading)? + heading.len();
-    let remainder = text[start..].trim_start();
-    let end = remainder.find("\n## ").unwrap_or(remainder.len());
-    Some(remainder[..end].trim())
+fn sections<'a>(text: &'a str, heading: &str) -> Vec<&'a str> {
+    let mut out = Vec::new();
+    let mut idx = 0;
+    while let Some(pos) = text[idx..].find(heading) {
+        let abs = idx + pos + heading.len();
+        let remainder = text[abs..].trim_start();
+        let end = remainder.find("\n## ").unwrap_or(remainder.len());
+        out.push(remainder[..end].trim());
+        idx = abs;
+    }
+    out
+}
+
+/// Every tool call result is recorded in the transcript as a `role: user`
+/// turn (that's how the Anthropic API represents tool results), so the
+/// *last* `## User` section is usually a synthetic tool-result echo, not
+/// the human's actual last message. Walk backward past those placeholder
+/// turns to find the last one with real human-authored text.
+fn latest_real_user_message(history: &str) -> Option<&str> {
+    sections(history, "## User")
+        .into_iter()
+        .rev()
+        .find(|section| is_real_user_text(section))
+}
+
+fn is_real_user_text(section: &str) -> bool {
+    section.lines().any(|line| {
+        let l = line.trim();
+        !l.is_empty()
+            && l != "[Tool result recorded]"
+            && !(l.starts_with("[Tool request: ") && l.ends_with(']'))
+    })
 }
 
 pub fn write_integrity(out: &Path, seq: u64) -> Result<()> {
@@ -470,6 +497,23 @@ mod tests {
     #[test]
     fn extracts_only_latest_section() {
         let text = "## User\n\nfirst\n\n## Assistant\n\nanswer\n\n## User\n\nlatest\n\n## Assistant\n\nnext";
-        assert_eq!(latest_section(text, "## User"), Some("latest"));
+        assert_eq!(latest_real_user_message(text), Some("latest"));
+    }
+
+    #[test]
+    fn skips_tool_result_placeholder_to_find_real_user_text() {
+        // Reproduces the reported bug: the session's last `## User` turn is
+        // a synthetic tool-result echo, not something the human typed.
+        let text = "## User\n\nplease refactor the parser\n\n## Assistant\n\n[Tool request: Edit]\n\n## User\n\n[Tool result recorded]\n\n## Assistant\n\ndone";
+        assert_eq!(
+            latest_real_user_message(text),
+            Some("please refactor the parser")
+        );
+    }
+
+    #[test]
+    fn returns_none_when_every_user_turn_is_a_placeholder() {
+        let text = "## User\n\n[Tool result recorded]\n\n## Assistant\n\nok";
+        assert_eq!(latest_real_user_message(text), None);
     }
 }
