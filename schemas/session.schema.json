@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/handoff-now/handoff-now/schemas/session.schema.json",
+  "title": "handoff-now session state",
+  "type": "object",
+  "required": ["schemaVersion", "sessionId", "cwd", "phase", "journalSequence", "updatedAt"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "cwd": { "type": ["string", "array"] },
+    "phase": { "enum": ["NORMAL", "PREPARING", "PREPARED", "HANDOFF_REQUIRED", "SEMANTIC_FINALIZING", "FINALIZED", "HARD_STOPPED", "EXHAUSTED", "RESET"] },
+    "usagePercentage": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "journalSequence": { "type": "integer", "minimum": 0 },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

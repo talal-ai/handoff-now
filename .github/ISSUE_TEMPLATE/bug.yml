@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible non-security issue
+body:
+  - type: markdown
+    attributes:
+      value: Do not include transcripts, handoff contents, API keys, or other secrets. Use a private security advisory for security issues.
+  - type: input
+    id: version
+    attributes: { label: handoff-now version }
+    validations: { required: true }
+  - type: input
+    id: claude
+    attributes: { label: Claude Code/Desktop version }
+    validations: { required: true }
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Windows x64, Windows ARM64, macOS Intel, macOS Apple Silicon]
+    validations: { required: true }
+  - type: textarea
+    id: reproduction
+    attributes: { label: Redacted reproduction steps }
+    validations: { required: true }

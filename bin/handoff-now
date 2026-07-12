@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+base="${HOME}/.claude/handoff-now/bin/handoff-now"
+if [ -x "$base" ]; then exec "$base" "$@"; fi
+if [ -x "${base}.exe" ]; then exec "${base}.exe" "$@"; fi
+echo "handoff-now is not initialized. Build the Rust binary and run: handoff-now setup" >&2
+exit 127

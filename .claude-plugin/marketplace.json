@@ -1,0 +1,19 @@
+{
+  "name": "handoff-now-marketplace",
+  "owner": {
+    "name": "handoff-now contributors"
+  },
+  "metadata": {
+    "description": "Production recovery tools for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "handoff-now",
+      "source": "./",
+      "description": "Quota-aware, crash-safe handoff packages for Claude Code and Desktop.",
+      "version": "0.1.0",
+      "category": "productivity",
+      "tags": ["handoff", "recovery", "quota"]
+    }
+  ]
+}

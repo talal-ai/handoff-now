@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    env:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: handoff-now-x86_64-pc-windows-msvc.exe
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            artifact: handoff-now-aarch64-pc-windows-msvc.exe
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact: handoff-now-aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            artifact: handoff-now-x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo test --all --locked
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Stage Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Copy-Item "target/${{ matrix.target }}/release/handoff-now.exe" "${{ matrix.artifact }}"
+      - name: Stage macOS binary
+        if: runner.os == 'macOS'
+        run: cp "target/${{ matrix.target }}/release/handoff-now" "${{ matrix.artifact }}"
+      - name: Import Apple signing identity
+        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE != ''
+        run: |
+          security create-keychain -p temporary build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p temporary build.keychain
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temporary build.keychain
+          codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "${{ matrix.artifact }}"
+          codesign --verify --strict --verbose=2 "${{ matrix.artifact }}"
+      - name: Notarize macOS binary archive
+        if: runner.os == 'macOS' && env.APPLE_ID != '' && env.APPLE_APP_PASSWORD != '' && env.APPLE_TEAM_ID != ''
+        run: |
+          ditto -c -k --keepParent "${{ matrix.artifact }}" notarization.zip
+          xcrun notarytool submit notarization.zip --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+      - name: Import and apply Authenticode certificate
+        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("certificate.pfx", [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          & signtool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f certificate.pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD "${{ matrix.artifact }}"
+          & signtool verify /pa /all /v "${{ matrix.artifact }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and SBOM
+        run: |
+          cd dist
+          sha256sum handoff-now-* > SHA256SUMS
+      - uses: anchore/sbom-action@v0
+        with:
+          path: dist
+          output-file: dist/sbom.spdx.json
+      - name: Publish draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            dist/handoff-now-*
+            dist/SHA256SUMS
+            dist/sbom.spdx.json

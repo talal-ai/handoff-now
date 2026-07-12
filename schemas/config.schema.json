@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/handoff-now/handoff-now/schemas/config.schema.json",
+  "title": "handoff-now configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "prepareAbovePercentage": { "type": "number", "minimum": 0, "maximum": 100, "default": 85 },
+    "handoffAbovePercentage": { "type": "number", "minimum": 0, "maximum": 100, "default": 90 },
+    "hardStopAbovePercentage": { "type": "number", "minimum": 0, "maximum": 100, "default": 95 },
+    "artifactDirectory": { "type": "string", "minLength": 1, "default": ".handoff-now" },
+    "semanticProvider": { "enum": ["hybrid", "subscription", "api", "deterministic"], "default": "hybrid" },
+    "apiModel": { "type": "string", "default": "claude-haiku-4-5-20251001" },
+    "retainRawTranscript": { "type": "boolean", "default": false },
+    "redactionMode": { "enum": ["standard", "strict"], "default": "standard" },
+    "includeGitDiff": { "type": "boolean", "default": true },
+    "maximumSemanticInputBytes": { "type": "integer", "minimum": 8192, "maximum": 2000000, "default": 120000 },
+    "telemetry": { "const": false }
+  }
+}

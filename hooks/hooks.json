@@ -1,0 +1,38 @@
+{
+  "description": "Journal Claude Code activity and enforce quota-aware handoff boundaries.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" SessionStart", "timeout": 15 }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" UserPromptSubmit", "timeout": 15 }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" PreToolUse", "timeout": 15 }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" PostToolUse", "timeout": 30 }] }
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" PostToolUseFailure", "timeout": 30 }] }
+    ],
+    "PostToolBatch": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" PostToolBatch", "timeout": 30 }] }
+    ],
+    "PreCompact": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" PreCompact", "timeout": 30 }] }
+    ],
+    "PostCompact": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" PostCompact", "timeout": 30 }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" Stop", "timeout": 60 }] }
+    ],
+    "StopFailure": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" StopFailure", "timeout": 60 }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-dispatch.sh\" SessionEnd", "timeout": 60 }] }
+    ]
+  }
+}

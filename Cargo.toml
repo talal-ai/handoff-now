@@ -1,0 +1,32 @@
+[package]
+name = "handoff-now"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Crash-safe quota-aware handoffs for Claude Code"
+repository = "https://github.com/handoff-now/handoff-now"
+
+[dependencies]
+anyhow = "1.0"
+atomicwrites = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6.0"
+fs2 = "0.4"
+hex = "0.4"
+keyring = { version = "=3.6.3", features = ["apple-native", "windows-native"] }
+regex = "1.11"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tempfile = "3.14"
+uuid = { version = "1.11", features = ["v4"] }
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
