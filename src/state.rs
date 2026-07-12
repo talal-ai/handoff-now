@@ -71,12 +71,29 @@ impl SessionState {
     }
 
     pub fn observe_usage(&mut self, usage: Option<f64>, reset: Option<i64>, config: &Config) {
+        self.updated_at = Utc::now();
+
+        // The status line fires on every render, but `rate_limits` is only
+        // present for Pro/Max subscribers after the first API response and
+        // may be absent on any individual render. When a render carries no
+        // reading, preserve the last known usage/reset instead of clobbering
+        // them back to "unknown" (which is what surfaced as
+        // "Five-hour usage: unknown" in handoffs).
+        let Some(pct) = usage else {
+            return;
+        };
+
         let old_reset = self.resets_at;
         let old_usage = self.usage_percentage;
-        self.usage_percentage = usage;
-        self.resets_at = reset;
-        self.updated_at = Utc::now();
-        if old_reset.is_some() && reset.is_some() && old_reset != reset && usage < old_usage {
+        self.usage_percentage = Some(pct);
+        if reset.is_some() {
+            self.resets_at = reset;
+        }
+        if old_reset.is_some()
+            && reset.is_some()
+            && old_reset != reset
+            && old_usage.is_some_and(|old| pct < old)
+        {
             self.transition(Phase::Reset);
             self.semantic_attempted = false;
             self.semantic_checkpoint_sequence = None;
@@ -85,7 +102,6 @@ impl SessionState {
             self.final_handoff_path = None;
             return;
         }
-        let Some(pct) = usage else { return };
         let target = if pct >= config.hard_stop_above_percentage {
             Phase::HardStopped
         } else if pct >= config.handoff_above_percentage {
@@ -221,5 +237,18 @@ mod tests {
         s.observe_usage(Some(92.0), Some(1), &c);
         s.observe_usage(Some(2.0), Some(2), &c);
         assert_eq!(s.phase, Phase::Reset);
+    }
+    #[test]
+    fn absent_reading_preserves_last_known_usage() {
+        // Reproduces the reported "Five-hour usage: unknown" bug: a status
+        // line render without `rate_limits` must not wipe a known reading.
+        let c = Config::default();
+        let mut s = SessionState::new("x".into(), PathBuf::from("."));
+        s.observe_usage(Some(50.0), Some(1), &c);
+        assert_eq!(s.usage_percentage, Some(50.0));
+        s.observe_usage(None, None, &c);
+        assert_eq!(s.usage_percentage, Some(50.0));
+        assert_eq!(s.resets_at, Some(1));
+        assert_eq!(s.phase, Phase::Normal);
     }
 }

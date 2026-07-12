@@ -76,12 +76,20 @@ fn store() -> Result<StateStore> {
     Ok(StateStore::new(Config::user_root()?))
 }
 fn latest_session_id() -> Option<String> {
-    store()
-        .ok()?
-        .list()
-        .ok()?
-        .first()
-        .map(|s| s.session_id.clone())
+    let sessions = store().ok()?.list().ok()?;
+    // Prefer the most recent session whose working directory is the one we're
+    // being invoked from, so a manual `/handoff-now:now` snapshots THIS
+    // project rather than whichever other window updated its state last.
+    if let Ok(cwd) = env::current_dir() {
+        let cwd = cwd.canonicalize().unwrap_or(cwd);
+        if let Some(s) = sessions
+            .iter()
+            .find(|s| s.cwd.canonicalize().unwrap_or_else(|_| s.cwd.clone()) == cwd)
+        {
+            return Some(s.session_id.clone());
+        }
+    }
+    sessions.first().map(|s| s.session_id.clone())
 }
 
 fn status() -> Result<()> {

@@ -52,6 +52,7 @@ pub fn handle_statusline(input: &str) -> Result<String> {
     let store = StateStore::new(root.clone());
     let mut should_snapshot = false;
     let mut phase = Phase::Normal;
+    let mut display_usage = usage;
     store.with_locked(
         id,
         |state| {
@@ -64,6 +65,9 @@ pub fn handle_statusline(input: &str) -> Result<String> {
             }
             state.observe_usage(usage, reset, &config);
             phase = state.phase;
+            // Show the last known reading on renders where `rate_limits` is
+            // absent, rather than flickering to "--".
+            display_usage = state.usage_percentage;
             should_snapshot = before != state.phase
                 && matches!(
                     state.phase,
@@ -86,7 +90,7 @@ pub fn handle_statusline(input: &str) -> Result<String> {
         spawn_snapshot(id);
     }
     let prior = render_previous_statusline(&root, input).unwrap_or_default();
-    let pct = usage
+    let pct = display_usage
         .map(|v| format!("{v:.0}%"))
         .unwrap_or_else(|| "--".into());
     let own = format!("handoff-now {pct} {:?}", phase);
