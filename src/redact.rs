@@ -1,3 +1,4 @@
+use crate::config::RedactionMode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -9,6 +10,7 @@ pub struct RedactionReport {
 
 pub struct Redactor {
     patterns: Vec<(&'static str, Regex)>,
+    strict: bool,
 }
 
 impl Default for Redactor {
@@ -41,11 +43,19 @@ impl Default for Redactor {
                 .into_iter()
                 .map(|(n, p)| (n, Regex::new(p).unwrap()))
                 .collect(),
+            strict: false,
         }
     }
 }
 
 impl Redactor {
+    pub fn for_mode(mode: &RedactionMode) -> Self {
+        Self {
+            strict: matches!(mode, RedactionMode::Strict),
+            ..Self::default()
+        }
+    }
+
     pub fn redact(&self, input: &str) -> (String, RedactionReport) {
         let mut output = input.to_owned();
         let mut report = RedactionReport::default();
@@ -68,12 +78,79 @@ impl Redactor {
                     .into_owned();
             }
         }
+        if self.strict {
+            let (stricter, hits) = redact_high_entropy(&output);
+            if hits > 0 {
+                report.categories.insert("high_entropy".into(), hits);
+                output = stricter;
+            }
+        }
         (output, report)
     }
 
     pub fn contains_secret(&self, input: &str) -> bool {
-        self.patterns.iter().any(|(_, p)| p.is_match(input))
+        if self.patterns.iter().any(|(_, p)| p.is_match(input)) {
+            return true;
+        }
+        self.strict && redact_high_entropy(input).1 > 0
     }
+}
+
+/// Shannon entropy (bits per char) of a token.
+fn shannon_entropy(token: &str) -> f64 {
+    let mut counts = std::collections::HashMap::new();
+    for c in token.chars() {
+        *counts.entry(c).or_insert(0usize) += 1;
+    }
+    let len = token.chars().count() as f64;
+    counts
+        .values()
+        .map(|&c| {
+            let p = c as f64 / len;
+            -p * p.log2()
+        })
+        .sum()
+}
+
+/// Redact long, high-entropy, mixed-charset tokens that pattern matching
+/// misses (opaque bearer/session tokens). Conservative: requires length,
+/// entropy, and character-class diversity so prose and hashes-in-context are
+/// left readable. Public model ids like `claude-...` are dominated by dashes
+/// and low entropy, so they survive.
+fn redact_high_entropy(input: &str) -> (String, usize) {
+    let mut hits = 0usize;
+    let out = input
+        .split_inclusive(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ',' | ')' | '('))
+        .map(|chunk| {
+            let trimmed = chunk.trim_end_matches(|c: char| {
+                c.is_whitespace() || matches!(c, '"' | '\'' | ',' | ')' | '(')
+            });
+            let suffix = &chunk[trimmed.len()..];
+            if is_high_entropy_secret(trimmed) {
+                hits += 1;
+                format!("[REDACTED:high_entropy]{suffix}")
+            } else {
+                chunk.to_string()
+            }
+        })
+        .collect::<String>();
+    (out, hits)
+}
+
+fn is_high_entropy_secret(token: &str) -> bool {
+    if token.len() < 24 || token.len() > 200 {
+        return false;
+    }
+    if !token.chars().all(|c| c.is_ascii_graphic()) {
+        return false;
+    }
+    let has_lower = token.chars().any(|c| c.is_ascii_lowercase());
+    let has_upper = token.chars().any(|c| c.is_ascii_uppercase());
+    let has_digit = token.chars().any(|c| c.is_ascii_digit());
+    // Require ALL three classes plus high entropy. Public model ids
+    // (`claude-...`), UUIDs, and git hashes are lowercase+digits only, so they
+    // stay readable; opaque mixed-case bearer/session tokens are caught.
+    has_lower && has_upper && has_digit && shannon_entropy(token) >= 3.6
 }
 
 #[cfg(test)]
@@ -85,5 +162,25 @@ mod tests {
         let (out, report) = r.redact("ANTHROPIC_API_KEY=sk-ant-abcdefghijklmnopqrstuvwxyz\nAuthorization: Bearer abc.def.ghi");
         assert!(!out.contains("abcdefghijklmnopqrstuvwxyz"));
         assert!(report.categories.values().sum::<usize>() >= 1);
+    }
+
+    #[test]
+    fn strict_catches_high_entropy_token_standard_misses() {
+        let opaque = "session=xQ7pL2mZ9rV4kT8wB3nF6dH1jC5aY0sE"; // no known prefix
+        let standard = Redactor::default();
+        let (std_out, _) = standard.redact(opaque);
+        assert!(std_out.contains("xQ7pL2mZ9rV4kT8wB3nF6dH1jC5aY0sE"));
+        let strict = Redactor::for_mode(&RedactionMode::Strict);
+        let (strict_out, report) = strict.redact(opaque);
+        assert!(!strict_out.contains("xQ7pL2mZ9rV4kT8wB3nF6dH1jC5aY0sE"));
+        assert!(report.categories.contains_key("high_entropy"));
+    }
+
+    #[test]
+    fn strict_leaves_public_model_ids_and_prose() {
+        let strict = Redactor::for_mode(&RedactionMode::Strict);
+        let text = "use claude-haiku-4-5-20251001 to summarize the handoff package now";
+        let (out, _) = strict.redact(text);
+        assert_eq!(out, text);
     }
 }

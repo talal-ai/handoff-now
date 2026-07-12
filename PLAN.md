@@ -9,6 +9,11 @@ forward vision for the Claude Code developer community. It is ordered by
 **value / risk**, not by ease. Each item lists: what, why, code touch points,
 acceptance criteria.
 
+> **Status (v0.2.0):** Phases 1–4 shipped. 1.1–1.5, 2.1–2.4, 3.1–3.2, 4.1–4.4
+> all landed with regression tests. Phase 5 partial: `doctor --fix`, portable
+> `export`, and `docs/recovery-scenarios.md` done; remaining Phase 5 items
+> (handoff templates, `diff`, local success counter) are still open.
+
 ---
 
 ## 0. Guiding principles (do not violate)

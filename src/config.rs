@@ -19,6 +19,12 @@ pub struct Config {
     pub include_git_diff: bool,
     pub maximum_semantic_input_bytes: usize,
     pub telemetry: bool,
+    /// Render a fresh deterministic handoff on every Stop so the artifact is
+    /// never more than one turn stale (Phase 2.2).
+    pub rolling_handoff: bool,
+    /// Force a deterministic snapshot when a single status-line render jumps
+    /// usage by at least this many points (Phase 3.2 spike guard).
+    pub spike_snapshot_delta: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -51,6 +57,8 @@ impl Default for Config {
             include_git_diff: true,
             maximum_semantic_input_bytes: 120_000,
             telemetry: false,
+            rolling_handoff: true,
+            spike_snapshot_delta: 15.0,
         }
     }
 }
@@ -81,6 +89,9 @@ impl Config {
             || self.maximum_semantic_input_bytes > 2_000_000
         {
             bail!("maximumSemanticInputBytes must be between 8192 and 2000000");
+        }
+        if !(0.0..=100.0).contains(&self.spike_snapshot_delta) {
+            bail!("spikeSnapshotDelta must be between 0 and 100");
         }
         Ok(())
     }

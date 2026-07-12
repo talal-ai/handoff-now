@@ -15,6 +15,8 @@
     "redactionMode": { "enum": ["standard", "strict"], "default": "standard" },
     "includeGitDiff": { "type": "boolean", "default": true },
     "maximumSemanticInputBytes": { "type": "integer", "minimum": 8192, "maximum": 2000000, "default": 120000 },
+    "rollingHandoff": { "type": "boolean", "default": true },
+    "spikeSnapshotDelta": { "type": "number", "minimum": 0, "maximum": 100, "default": 15 },
     "telemetry": { "const": false }
   }
 }

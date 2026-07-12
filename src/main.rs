@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use handoff_now::{
+    artifacts::{export_resume, tail_events, verify_integrity},
     config::Config,
     credentials,
     engine::{handle_hook, handle_statusline, read_stdin, snapshot_session},
@@ -7,7 +8,7 @@ use handoff_now::{
     state::StateStore,
 };
 use serde_json::json;
-use std::env;
+use std::{env, path::PathBuf};
 
 fn main() {
     if let Err(err) = run() {
@@ -35,7 +36,38 @@ fn run() -> Result<()> {
             setup::uninstall()?;
             println!("Restored the previous Claude status line. Recovery data was retained.");
         }
-        Some("doctor") => println!("{}", serde_json::to_string_pretty(&setup::doctor()?)?),
+        Some("doctor") => {
+            if args.next().as_deref() == Some("--fix") {
+                let _ = setup::install();
+            }
+            println!("{}", serde_json::to_string_pretty(&setup::doctor()?)?)
+        }
+        Some("verify") => {
+            let id = args
+                .next()
+                .or_else(latest_session_id)
+                .context("no session id")?;
+            let report = verify_integrity(&resolve_out(&id)?)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                std::process::exit(3);
+            }
+        }
+        Some("export") => {
+            let id = args
+                .next()
+                .or_else(latest_session_id)
+                .context("no session id")?;
+            let path = export_resume(&resolve_out(&id)?)?;
+            println!("Portable resume written to {}", path.display());
+        }
+        Some("tail") => {
+            let id = args
+                .next()
+                .or_else(latest_session_id)
+                .context("no session id")?;
+            println!("{}", tail_events(&resolve_out(&id)?, 20));
+        }
         Some("configure") => println!(
             "Edit {} and run `handoff-now doctor`.",
             setup::print_config_path()?.display()
@@ -74,6 +106,14 @@ fn run() -> Result<()> {
 
 fn store() -> Result<StateStore> {
     Ok(StateStore::new(Config::user_root()?))
+}
+fn resolve_out(id: &str) -> Result<PathBuf> {
+    let root = Config::user_root()?;
+    let config = Config::load_or_default(&root.join("config.json"), &root.join("diagnostics.log"));
+    let state = StateStore::new(root)
+        .load(id)?
+        .context("session not found")?;
+    handoff_now::artifacts::artifact_dir(&state, &config)
 }
 fn latest_session_id() -> Option<String> {
     let sessions = store().ok()?.list().ok()?;
@@ -131,7 +171,10 @@ USAGE:
   handoff-now status
   handoff-now now [SESSION_ID]
   handoff-now resume [SESSION_ID]
-  handoff-now doctor
+  handoff-now verify [SESSION_ID]
+  handoff-now export [SESSION_ID]
+  handoff-now tail [SESSION_ID]
+  handoff-now doctor [--fix]
   handoff-now configure
   handoff-now credential store|delete|status
   handoff-now uninstall

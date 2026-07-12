@@ -46,7 +46,14 @@ pub struct SessionState {
     pub emergency_semantic_attempted: bool,
     pub final_handoff_path: Option<PathBuf>,
     pub updated_at: DateTime<Utc>,
+    /// Recent `(unix_seconds, usage_percentage)` samples for the deterministic
+    /// burn-rate predictor (Phase 3.1). Bounded ring; oldest evicted.
+    #[serde(default)]
+    pub usage_samples: Vec<(i64, f64)>,
 }
+
+/// Maximum retained usage samples for burn-rate estimation.
+const MAX_USAGE_SAMPLES: usize = 24;
 
 impl SessionState {
     pub fn new(session_id: String, cwd: PathBuf) -> Self {
@@ -67,7 +74,54 @@ impl SessionState {
             emergency_semantic_attempted: false,
             final_handoff_path: None,
             updated_at: Utc::now(),
+            usage_samples: Vec::new(),
         }
+    }
+
+    /// Record a usage sample and return the jump (points) versus the previous
+    /// reading, if any. Used by the spike guard.
+    pub fn record_sample(&mut self, pct: f64) -> Option<f64> {
+        let now = Utc::now().timestamp();
+        let jump = self.usage_samples.last().map(|(_, prev)| pct - prev);
+        self.usage_samples.push((now, pct));
+        if self.usage_samples.len() > MAX_USAGE_SAMPLES {
+            let overflow = self.usage_samples.len() - MAX_USAGE_SAMPLES;
+            self.usage_samples.drain(0..overflow);
+        }
+        jump
+    }
+
+    /// Deterministic burn rate in usage-points per minute over the retained
+    /// samples (least-squares slope). `None` until there is enough signal.
+    pub fn burn_rate_per_minute(&self) -> Option<f64> {
+        let pts = &self.usage_samples;
+        if pts.len() < 3 {
+            return None;
+        }
+        let t0 = pts[0].0 as f64;
+        let xs: Vec<f64> = pts.iter().map(|(t, _)| (*t as f64 - t0) / 60.0).collect();
+        let ys: Vec<f64> = pts.iter().map(|(_, p)| *p).collect();
+        let n = xs.len() as f64;
+        let sx: f64 = xs.iter().sum();
+        let sy: f64 = ys.iter().sum();
+        let sxx: f64 = xs.iter().map(|x| x * x).sum();
+        let sxy: f64 = xs.iter().zip(&ys).map(|(x, y)| x * y).sum();
+        let denom = n * sxx - sx * sx;
+        if denom.abs() < f64::EPSILON {
+            return None;
+        }
+        let slope = (n * sxy - sx * sy) / denom;
+        (slope > 0.0).then_some(slope)
+    }
+
+    /// Estimated minutes until `target` usage at the current burn rate.
+    pub fn minutes_to(&self, target: f64) -> Option<f64> {
+        let rate = self.burn_rate_per_minute()?;
+        let current = self.usage_percentage?;
+        if current >= target {
+            return Some(0.0);
+        }
+        Some((target - current) / rate)
     }
 
     pub fn observe_usage(&mut self, usage: Option<f64>, reset: Option<i64>, config: &Config) {
@@ -86,6 +140,7 @@ impl SessionState {
         let old_reset = self.resets_at;
         let old_usage = self.usage_percentage;
         self.usage_percentage = Some(pct);
+        self.record_sample(pct);
         if reset.is_some() {
             self.resets_at = reset;
         }
@@ -100,6 +155,8 @@ impl SessionState {
             self.preparation_semantic_attempted = false;
             self.emergency_semantic_attempted = false;
             self.final_handoff_path = None;
+            self.usage_samples.clear();
+            self.record_sample(pct);
             return;
         }
         let target = if pct >= config.hard_stop_above_percentage {
@@ -156,7 +213,29 @@ impl StateStore {
             .read(true)
             .write(true)
             .open(self.lock_path(id))?;
-        lock.lock_exclusive().context("acquire session lock")?;
+        // Bounded acquisition (Phase 2.4). Hooks run under a timeout; a wedged
+        // or orphaned holder must not make every tool call hang. Try for a few
+        // seconds, then proceed best-effort so the journal/state still advance
+        // (atomic writes keep the state file consistent regardless).
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        let mut held = false;
+        loop {
+            match lock.try_lock_exclusive() {
+                Ok(()) => {
+                    held = true;
+                    break;
+                }
+                Err(_) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                Err(_) => {
+                    eprintln!(
+                        "handoff-now: session lock busy after timeout; proceeding best-effort"
+                    );
+                    break;
+                }
+            }
+        }
         let mut state = self
             .load(id)?
             .unwrap_or_else(|| SessionState::new(id.to_owned(), cwd.to_path_buf()));
@@ -164,7 +243,9 @@ impl StateStore {
         if result.is_ok() {
             self.save(&state)?;
         }
-        FileExt::unlock(&lock)?;
+        if held {
+            FileExt::unlock(&lock)?;
+        }
         result
     }
 
@@ -251,6 +332,29 @@ mod tests {
             s.observe_usage(None, None, &c);
         }
         assert_eq!((s.usage_percentage, s.resets_at, s.phase), (u, r, p));
+    }
+    #[test]
+    fn burn_rate_and_eta_are_positive_when_rising() {
+        let mut s = SessionState::new("x".into(), PathBuf::from("."));
+        // Synthesize rising samples ~1 point/sample.
+        let base = Utc::now().timestamp();
+        for i in 0..6 {
+            s.usage_samples.push((base + i * 60, 50.0 + i as f64));
+        }
+        s.usage_percentage = Some(55.0);
+        let rate = s.burn_rate_per_minute().expect("rate");
+        assert!(rate > 0.0);
+        let eta = s.minutes_to(95.0).expect("eta");
+        assert!(eta > 0.0 && eta.is_finite());
+    }
+    #[test]
+    fn flat_usage_has_no_burn_rate() {
+        let mut s = SessionState::new("x".into(), PathBuf::from("."));
+        let base = Utc::now().timestamp();
+        for i in 0..6 {
+            s.usage_samples.push((base + i * 60, 50.0));
+        }
+        assert!(s.burn_rate_per_minute().is_none());
     }
     #[test]
     fn absent_reading_preserves_last_known_usage() {

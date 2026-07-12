@@ -92,10 +92,16 @@ The `setup` step preserves and chains an existing status line, creates a timesta
 | `/handoff-now:setup` | 🔧 Install or repair the watcher (fetches the engine automatically if missing). |
 | `/handoff-now:status` | 📊 Show session state and usage bands. |
 | `/handoff-now:now` | 📸 Create a handoff immediately. |
-| `/handoff-now:resume` | ▶️ Generate a verified resume prompt. |
-| `/handoff-now:doctor` | 🩺 Check installation health. |
+| `/handoff-now:resume` | ▶️ Generate a verified resume prompt (rebuilds from the journal if no handoff exists). |
+| `/handoff-now:doctor` | 🩺 Check installation health (`doctor --fix` auto-repairs). |
 | `/handoff-now:configure` | ⚙️ Locate and explain configuration. |
 | `/handoff-now:uninstall` | 🧹 Restore the previous status line without deleting recovery data. |
+
+Additional native CLI verbs (also usable directly): `handoff-now verify`
+(integrity/tamper check against `integrity.json`), `handoff-now export`
+(write a portable self-contained `RESUME.md`), and `handoff-now tail` (recent
+journal events). See [`docs/recovery-scenarios.md`](docs/recovery-scenarios.md)
+for step-by-step "it died — now what" walkthroughs.
 
 To keep an isolated Haiku API credential in Windows Credential Manager or macOS Keychain, pipe it to the native CLI so it never appears in command history:
 

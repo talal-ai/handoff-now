@@ -4,6 +4,35 @@ All notable changes follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-13
+
+### Fixed
+- Long-session recovery: transcript rendering now keeps a head+tail window so
+  the *current* user goal (transcript tail) survives the safety cap instead of
+  being silently dropped in favour of a stale early message.
+- Stopped journal inflation: renders without `rate_limits` no longer append a
+  null `UsageObserved` event or inflate `journalSequence`.
+- Unified journal-sequence provenance between the hook and API promote paths.
+
+### Added
+- Deterministic snapshots on `SessionEnd` and `PreCompact` so graceful exits
+  and context compaction always leave a fresh handoff.
+- Rolling handoff on every `Stop` (config `rollingHandoff`, default on) — the
+  artifact is never more than one turn stale.
+- `resume` rebuilds a deterministic handoff from `EVENTS.jsonl` when no handoff
+  file exists (e.g. a hard kill before any snapshot).
+- Burn-rate predictor: the status line shows an estimated `~Nm to wall`, and a
+  spike guard (`spikeSnapshotDelta`, default 15) forces a snapshot on a large
+  single-render usage jump.
+- Bounded session-lock acquisition so a wedged holder can no longer hang hooks.
+- Stop-time reconciliation promotes a valid on-disk semantic candidate even if a
+  subagent's `PostToolUse` fired under a different session id.
+- Strict redaction mode now active: entropy-based detection of opaque
+  mixed-case tokens that pattern matching misses (public model ids, UUIDs, and
+  hashes stay readable).
+- New commands: `verify` (integrity/tamper check), `export` (portable
+  `RESUME.md`), `tail` (recent journal), and `doctor --fix` (auto-repair).
+
 ## [0.1.1] - 2026-07-12
 
 - Preserve the last known five-hour usage/reset across status-line renders instead of clobbering it to "unknown" when `rate_limits` is momentarily absent; display the retained value in the status line.

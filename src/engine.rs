@@ -53,6 +53,7 @@ pub fn handle_statusline(input: &str) -> Result<String> {
     let mut should_snapshot = false;
     let mut phase = Phase::Normal;
     let mut display_usage = usage;
+    let mut eta_minutes = None;
     store.with_locked(
         id,
         |state| {
@@ -68,11 +69,20 @@ pub fn handle_statusline(input: &str) -> Result<String> {
             // Show the last known reading on renders where `rate_limits` is
             // absent, rather than flickering to "--".
             display_usage = state.usage_percentage;
-            should_snapshot = before != state.phase
+            eta_minutes = state.minutes_to(config.hard_stop_above_percentage);
+            let band_transition = before != state.phase
                 && matches!(
                     state.phase,
                     Phase::Preparing | Phase::HandoffRequired | Phase::HardStopped
                 );
+            // Spike guard (Phase 3.2): a large single-render jump is the exact
+            // danger case where usage teleports past the bands. Force a
+            // deterministic snapshot even if no band boundary was crossed.
+            let spike = match (usage, before_usage) {
+                (Some(new), Some(old)) => new - old >= config.spike_snapshot_delta,
+                _ => false,
+            };
+            should_snapshot = band_transition || spike;
             // Only journal when something actually changed. A render without
             // `rate_limits` preserves the last known reading (see
             // observe_usage), so comparing the raw incoming `None` against the
@@ -106,7 +116,11 @@ pub fn handle_statusline(input: &str) -> Result<String> {
     let pct = display_usage
         .map(|v| format!("{v:.0}%"))
         .unwrap_or_else(|| "--".into());
-    let own = format!("handoff-now {pct} {:?}", phase);
+    let eta = eta_minutes
+        .filter(|m| *m > 0.0 && m.is_finite())
+        .map(|m| format!(" ~{:.0}m to wall", m.ceil()))
+        .unwrap_or_default();
+    let own = format!("handoff-now {pct} {:?}{eta}", phase);
     Ok(if prior.trim().is_empty() {
         own
     } else {
@@ -243,6 +257,12 @@ pub fn handle_hook(input: &str) -> Result<HookOutcome> {
             let out = artifact_dir(state, &config)?;
             if !out.join("HANDOFF.md").exists() { let _ = snapshot(state, &config, "protected handoff"); }
             outcome = protected_outcome(state, &config, event, &hook, &out)?;
+        } else if event == "Stop" && config.rolling_handoff {
+            // Rolling handoff (Phase 2.2): keep HANDOFF.md at most one turn
+            // stale during normal work so a later hard kill still leaves a
+            // current artifact. Only in non-protected phases; protected bands
+            // above own their own snapshot + stop semantics.
+            let _ = snapshot(state, &config, "rolling Stop checkpoint");
         }
         Ok(())
     }, &cwd)?;
@@ -279,6 +299,23 @@ fn protected_outcome(
             json!({"hookSpecificOutput":{"hookEventName":"PostToolBatch","additionalContext": format!("HANDOFF-NOW EMERGENCY MODE: stop implementation. Invoke the handoff-now:handoff-writer agent using the existing factual package at {}, write only SUMMARY.candidate.md, then stop.", out.display())}}),
         ),
         "Stop" => {
+            // Reconciliation (1.5): if a valid SUMMARY.candidate.md is already
+            // on disk but was never promoted — e.g. a subagent's PostToolUse
+            // fired under a different session_id and missed the parent — promote
+            // it here instead of losing the enrichment.
+            let candidate_path = out.join("SUMMARY.candidate.md");
+            if candidate_path.is_file() && !out.join("SUMMARY.validated").is_file() {
+                let candidate = fs::read_to_string(&candidate_path).unwrap_or_default();
+                let seq = crate::artifacts::session_json_sequence(out, state.journal_sequence);
+                if promote_summary(out, &candidate, seq).is_ok() {
+                    state.semantic_attempted = true;
+                    state.transition(Phase::Finalized);
+                    let refreshed = snapshot(state, config, "reconciled semantic candidate")?;
+                    return Ok(
+                        json!({"continue": false, "stopReason": format!("Handoff finalized at {}", refreshed.join("HANDOFF.md").display())}),
+                    );
+                }
+            }
             if out.join("HANDOFF.md").is_file() && state.semantic_attempted {
                 state.transition(Phase::Finalized);
                 let refreshed = snapshot(state, config, "semantic attempt completed")?;
@@ -303,11 +340,8 @@ fn protected_outcome(
                 canonical_from(p, &state.cwd) == canonical_for_compare(&candidate_path)
             }) {
                 let candidate = fs::read_to_string(&candidate_path).unwrap_or_default();
-                let expected_sequence = fs::read(out.join("SESSION.json"))
-                    .ok()
-                    .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-                    .and_then(|value| value.get("journalSequence").and_then(Value::as_u64))
-                    .unwrap_or(state.journal_sequence);
+                let expected_sequence =
+                    crate::artifacts::session_json_sequence(out, state.journal_sequence);
                 match promote_summary(out, &candidate, expected_sequence) {
                     Ok(()) => {
                         state.semantic_attempted = true;
@@ -510,7 +544,7 @@ fn maybe_api_summary(id: &str, out: &Path) -> Result<()> {
         .pointer("/content/0/text")
         .and_then(Value::as_str)
         .context("Haiku returned no text")?;
-    let (candidate, _) = Redactor::default().redact(candidate);
+    let (candidate, _) = Redactor::for_mode(&config.redaction_mode).redact(candidate);
     promote_summary(out, &candidate, state.journal_sequence)?;
     store.with_locked(
         id,
