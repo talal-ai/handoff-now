@@ -73,13 +73,26 @@ pub fn handle_statusline(input: &str) -> Result<String> {
                     state.phase,
                     Phase::Preparing | Phase::HandoffRequired | Phase::HardStopped
                 );
-            if before_usage != usage || before_reset != reset || before != state.phase {
+            // Only journal when something actually changed. A render without
+            // `rate_limits` preserves the last known reading (see
+            // observe_usage), so comparing the raw incoming `None` against the
+            // stored `Some(..)` would append a spurious null event on every
+            // such render and inflate journal_sequence. Compare the *effective*
+            // post-observe values instead, and log those (never null).
+            let reading_present = usage.is_some() || reset.is_some();
+            let usage_changed = reading_present
+                && (before_usage != state.usage_percentage || before_reset != state.resets_at);
+            if before != state.phase || usage_changed {
                 append_event(
                     state,
                     &config,
                     "UsageObserved",
                     "statusLine",
-                    json!({"percentage": usage, "resetsAt": reset, "phase": state.phase}),
+                    json!({
+                        "percentage": state.usage_percentage,
+                        "resetsAt": state.resets_at,
+                        "phase": state.phase
+                    }),
                 )?;
             }
             Ok(())
@@ -204,6 +217,15 @@ pub fn handle_hook(input: &str) -> Result<HookOutcome> {
         state.cwd = cwd.clone();
         if transcript.is_some() { state.transcript_path = transcript.clone(); }
         append_event(state, &config, event, "hook", compact_hook(&hook))?;
+
+        // Guarantee a fresh deterministic handoff at the two graceful
+        // context-loss boundaries even when usage never crossed a band.
+        // Without this, a session that ends (or compacts its context) below
+        // 85% leaves no current HANDOFF.md, and `resume` has nothing to name.
+        // PreCompact is the ideal pre-context-loss checkpoint.
+        if matches!(event, "SessionEnd" | "PreCompact") {
+            let _ = snapshot(state, &config, &format!("{event} deterministic checkpoint"));
+        }
 
         if event == "StopFailure" {
             state.transition(Phase::Exhausted);

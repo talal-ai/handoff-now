@@ -239,6 +239,20 @@ mod tests {
         assert_eq!(s.phase, Phase::Reset);
     }
     #[test]
+    fn absent_render_does_not_change_effective_reading() {
+        // Regression for journal inflation: after one real reading, renders
+        // without rate_limits must leave the effective usage/reset unchanged
+        // so the statusline handler appends no spurious event.
+        let c = Config::default();
+        let mut s = SessionState::new("x".into(), PathBuf::from("."));
+        s.observe_usage(Some(50.0), Some(1), &c);
+        let (u, r, p) = (s.usage_percentage, s.resets_at, s.phase);
+        for _ in 0..100 {
+            s.observe_usage(None, None, &c);
+        }
+        assert_eq!((s.usage_percentage, s.resets_at, s.phase), (u, r, p));
+    }
+    #[test]
     fn absent_reading_preserves_last_known_usage() {
         // Reproduces the reported "Five-hour usage: unknown" bug: a status
         // line render without `rate_limits` must not wipe a known reading.

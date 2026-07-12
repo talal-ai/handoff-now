@@ -103,9 +103,18 @@ fn status() -> Result<()> {
 
 fn resume(id: &str) -> Result<()> {
     let state = store()?.load(id)?.context("session not found")?;
-    let handoff = state
-        .final_handoff_path
-        .context("session has no handoff yet")?;
+    let handoff = match state.final_handoff_path.clone() {
+        Some(path) if path.is_file() => path,
+        _ => {
+            // No materialized handoff — e.g. a hard kill before any snapshot
+            // ran. The append-only journal is always on disk, so rebuild a
+            // deterministic handoff from it instead of failing.
+            eprintln!(
+                "handoff-now: no saved handoff for this session; rebuilding deterministically from the journal..."
+            );
+            snapshot_session(id, "resume deterministic fallback")?.join("HANDOFF.md")
+        }
+    };
     if !handoff.is_file() {
         bail!("handoff file does not exist: {}", handoff.display());
     }

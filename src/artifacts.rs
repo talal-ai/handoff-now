@@ -154,26 +154,63 @@ fn extract_transcript(
     reader.seek(SeekFrom::Start(0))?;
     let redactor = Redactor::default();
     let mut line = String::new();
-    let mut bytes = 0usize;
+
+    // Head + tail window. The whole transcript rarely fits under the safety
+    // cap in a real multi-hour session, and the single most important record
+    // — the user's *current* goal — lives at the END. Keep a small head (early
+    // setup/goal) and a larger tail (recent work + latest goal); drop only the
+    // middle. Older code kept the head and silently discarded the tail, which
+    // surfaced a stale goal in `latest_real_user_message`.
+    let cap = config.maximum_semantic_input_bytes.saturating_mul(4);
+    let head_budget = cap / 4;
+    let tail_budget = cap - head_budget;
+
+    let mut head = String::new();
+    let mut head_full = false;
+    let mut tail: std::collections::VecDeque<String> = std::collections::VecDeque::new();
+    let mut tail_bytes = 0usize;
+    let mut elided_bytes = 0usize;
+
     while reader.read_line(&mut line)? > 0 {
-        bytes += line.len();
-        if bytes > config.maximum_semantic_input_bytes.saturating_mul(4) {
-            markdown
-                .push_str("\n> Transcript rendering truncated by the configured safety limit.\n");
-            break;
-        }
-        match serde_json::from_str::<Value>(&line) {
-            Ok(v) => {
-                if let Some(rendered) = render_transcript_record(&v) {
+        let block = match serde_json::from_str::<Value>(&line) {
+            Ok(v) => match render_transcript_record(&v) {
+                Some(rendered) => {
                     let (safe, report) = redactor.redact(&rendered);
                     merge_report(&mut combined, report);
-                    markdown.push_str(&safe);
-                    markdown.push_str("\n\n");
+                    format!("{safe}\n\n")
                 }
-            }
-            Err(_) => markdown.push_str("> Malformed transcript record skipped.\n\n"),
-        }
+                None => {
+                    line.clear();
+                    continue;
+                }
+            },
+            Err(_) => "> Malformed transcript record skipped.\n\n".to_string(),
+        };
         line.clear();
+
+        if !head_full && head.len() + block.len() <= head_budget {
+            head.push_str(&block);
+            continue;
+        }
+        head_full = true;
+        tail_bytes += block.len();
+        tail.push_back(block);
+        while tail_bytes > tail_budget && tail.len() > 1 {
+            if let Some(front) = tail.pop_front() {
+                tail_bytes -= front.len();
+                elided_bytes += front.len();
+            }
+        }
+    }
+
+    markdown.push_str(&head);
+    if elided_bytes > 0 {
+        markdown.push_str(&format!(
+            "\n> [middle elided: {elided_bytes} bytes dropped to fit the safety cap; newest turns retained below]\n\n"
+        ));
+    }
+    for block in &tail {
+        markdown.push_str(block);
     }
     state.last_transcript_offset = reader.stream_position()?;
     Ok((markdown, combined))
@@ -515,5 +552,55 @@ mod tests {
     fn returns_none_when_every_user_turn_is_a_placeholder() {
         let text = "## User\n\n[Tool result recorded]\n\n## Assistant\n\nok";
         assert_eq!(latest_real_user_message(text), None);
+    }
+
+    #[test]
+    fn keeps_newest_goal_when_transcript_exceeds_cap() {
+        use std::io::Write as _;
+        // Build a transcript far larger than the cap whose *latest* user turn
+        // holds the real goal. Old head-only truncation dropped this tail and
+        // surfaced a stale goal; head+tail must retain it.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("transcript.jsonl");
+        let mut f = fs::File::create(&path).unwrap();
+        let filler = "x".repeat(1000);
+        writeln!(
+            f,
+            "{}",
+            serde_json::json!({"type":"user","message":{"role":"user","content":"OLD_FIRST_GOAL"}})
+        )
+        .unwrap();
+        for _ in 0..80 {
+            writeln!(
+                f,
+                "{}",
+                serde_json::json!({"type":"assistant","message":{"role":"assistant","content":filler}})
+            )
+            .unwrap();
+        }
+        writeln!(
+            f,
+            "{}",
+            serde_json::json!({"type":"user","message":{"role":"user","content":"FIND_ME_LATEST_GOAL"}})
+        )
+        .unwrap();
+
+        let config = Config {
+            maximum_semantic_input_bytes: 8_192,
+            ..Config::default()
+        };
+        let mut state = SessionState::new("t".into(), dir.path().to_path_buf());
+        state.transcript_path = Some(path);
+        let (history, _) = extract_transcript(&mut state, &config).unwrap();
+
+        assert!(
+            history.contains("FIND_ME_LATEST_GOAL"),
+            "newest goal dropped"
+        );
+        assert!(history.contains("middle elided"), "no elision marker");
+        assert_eq!(
+            latest_real_user_message(&history),
+            Some("FIND_ME_LATEST_GOAL")
+        );
     }
 }
