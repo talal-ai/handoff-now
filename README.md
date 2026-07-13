@@ -41,6 +41,13 @@ Restart Claude Code once after the first install so the status-line trust
 prompt and hooks load consistently, then run `/handoff-now:doctor` to
 confirm it's healthy.
 
+**Updating (existing users):** you don't run anything. When the plugin updates,
+the next session start notices the engine version no longer matches the plugin
+version and downloads the matching release in the background (checksum-verified,
+non-blocking, offline-safe). The new engine is live on the following session —
+no cache clear, no manual `setup`. Run `/handoff-now:doctor` to see the live
+`engineVersion` any time.
+
 The release binaries are not code-signed (that costs money and isn't
 required to run them). On first execution, macOS or Windows may show a
 one-time "unknown publisher" warning — this is normal for unsigned

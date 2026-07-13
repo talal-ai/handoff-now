@@ -15,6 +15,12 @@ All notable changes follow Semantic Versioning.
 - Unified journal-sequence provenance between the hook and API promote paths.
 
 ### Added
+- Automatic engine updates: on session start the dispatch hook compares the
+  installed engine version with the plugin version and, on mismatch, fetches the
+  matching release in the background (checksum-verified, rate-limited, offline
+  safe). Existing users no longer stay pinned to an old engine — no manual
+  command. Binary replacement is Windows-safe (renames a running `.exe` aside).
+  `doctor` now reports `engineVersion`.
 - Deterministic snapshots on `SessionEnd` and `PreCompact` so graceful exits
   and context compaction always leave a fresh handoff.
 - Rolling handoff on every `Stop` (config `rollingHandoff`, default on) — the

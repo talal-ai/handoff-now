@@ -15,6 +15,48 @@ fn claude_settings() -> Result<PathBuf> {
     Ok(Config::claude_dir()?.join("settings.json"))
 }
 
+/// Engine version this binary was compiled at.
+pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Replace the stable engine binary, tolerating the common auto-update case
+/// where another session is currently running the old one. Windows refuses to
+/// overwrite a running `.exe`, but it will let us rename it aside first, so we
+/// move the old file to a unique name and drop the new one in its place. Any
+/// leftover `*.old-*` files are cleaned up best-effort on the next install.
+fn install_binary(source: &Path, stable: &Path) -> Result<()> {
+    if stable.exists() {
+        let aside = stable.with_file_name(format!(
+            "{}.old-{}",
+            stable
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("handoff-now"),
+            Utc::now().format("%Y%m%d%H%M%S")
+        ));
+        // If this fails (e.g. Unix, or nothing running) the copy below still
+        // overwrites in place, so ignore the error.
+        let _ = fs::rename(stable, &aside);
+    }
+    fs::copy(source, stable).with_context(|| format!("copy binary to {}", stable.display()))?;
+    if let Some(dir) = stable.parent() {
+        cleanup_old_binaries(dir);
+    }
+    Ok(())
+}
+
+/// Remove stale `*.old-*` engine files left by a previous self-update. The one
+/// still in use (if any) fails to delete and is retried next time.
+fn cleanup_old_binaries(dir: &Path) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if name.to_string_lossy().contains(".old-") {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
+}
+
 pub fn install() -> Result<PathBuf> {
     let root = Config::user_root()?;
     let bin = root.join("bin");
@@ -27,8 +69,7 @@ pub fn install() -> Result<PathBuf> {
     };
     let stable = bin.join(name);
     if source != stable {
-        fs::copy(&source, &stable)
-            .with_context(|| format!("copy binary to {}", stable.display()))?;
+        install_binary(&source, &stable)?;
     }
     #[cfg(unix)]
     {
@@ -151,6 +192,7 @@ pub fn doctor() -> Result<Value> {
     Ok(json!({
         "ok": status_installed && config.validate().is_ok(),
         "root": root,
+        "engineVersion": ENGINE_VERSION,
         "statusLineInstalled": status_installed,
         "configValid": config.validate().is_ok(),
         "gitAvailable": git,
@@ -174,4 +216,26 @@ pub fn stable_binary_path() -> Result<PathBuf> {
 
 pub fn settings_path_for_tests(home: &Path) -> PathBuf {
     home.join(".claude").join("settings.json")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn install_binary_replaces_and_cleans_up() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("new-engine");
+        let stable = dir.path().join("handoff-now");
+        fs::write(&source, b"NEW").unwrap();
+        fs::write(&stable, b"OLD").unwrap();
+        install_binary(&source, &stable).unwrap();
+        assert_eq!(fs::read(&stable).unwrap(), b"NEW");
+        // The renamed-aside old copy is cleaned up in the same call.
+        let leftovers = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().contains(".old-"))
+            .count();
+        assert_eq!(leftovers, 0);
+    }
 }
