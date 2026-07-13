@@ -140,11 +140,26 @@ fn extract_transcript(
 ) -> Result<(String, RedactionReport)> {
     let mut markdown = String::from("# Redacted Chat History\n\n");
     let mut combined = RedactionReport::default();
-    let Some(path) = &state.transcript_path else {
-        markdown.push_str("Transcript path was not available.\n");
+
+    // Resolve the transcript. Some Claude Code clients (observed in the desktop
+    // app) hand the hook a `transcript_path`/`session_id` that does not match
+    // the real transcript file on disk, which left the handoff with no goal and
+    // no history. When the recorded path is missing, discover the actual
+    // transcript under `~/.claude/projects/<encoded-cwd>/*.jsonl` and use it.
+    let recorded = state.transcript_path.clone().filter(|p| p.is_file());
+    let discovered = recorded
+        .is_none()
+        .then(|| discover_transcript(&state.cwd, &state.session_id))
+        .flatten();
+    let Some(path) = recorded.or(discovered) else {
+        markdown.push_str("Transcript path was not available (none recorded and none found under the project's Claude transcript directory).\n");
         return Ok((markdown, combined));
     };
-    let file = match fs::File::open(path) {
+    if state.transcript_path.as_deref() != Some(path.as_path()) {
+        markdown.push_str("> Transcript auto-discovered (recorded path was missing).\n\n");
+        state.transcript_path = Some(path.clone());
+    }
+    let file = match fs::File::open(&path) {
         Ok(f) => f,
         Err(err) => {
             markdown.push_str(&format!("Transcript could not be opened: {err}\n"));
@@ -215,6 +230,51 @@ fn extract_transcript(
     }
     state.last_transcript_offset = reader.stream_position()?;
     Ok((markdown, combined))
+}
+
+/// Claude Code stores a project's transcripts under
+/// `~/.claude/projects/<encoded-cwd>/`, where the folder name is the absolute
+/// working directory with `:`, `\`, and `/` each replaced by `-`.
+fn claude_project_dir_in(claude_root: &Path, cwd: &Path) -> PathBuf {
+    let encoded: String = cwd
+        .to_string_lossy()
+        .chars()
+        .map(|c| {
+            if matches!(c, ':' | '\\' | '/') {
+                '-'
+            } else {
+                c
+            }
+        })
+        .collect();
+    claude_root.join("projects").join(encoded)
+}
+
+/// Find the real transcript for a session when the recorded path is missing.
+/// Prefers a file whose stem equals the session id; otherwise the most recently
+/// modified `.jsonl` in the project's transcript directory (the live session).
+fn discover_transcript(cwd: &Path, session_id: &str) -> Option<PathBuf> {
+    discover_transcript_in(&Config::claude_dir().ok()?, cwd, session_id)
+}
+
+fn discover_transcript_in(claude_root: &Path, cwd: &Path, session_id: &str) -> Option<PathBuf> {
+    let dir = claude_project_dir_in(claude_root, cwd);
+    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+    for entry in fs::read_dir(&dir).ok()?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|x| x.to_str()) != Some("jsonl") {
+            continue;
+        }
+        if path.file_stem().and_then(|s| s.to_str()) == Some(session_id) {
+            return Some(path);
+        }
+        if let Ok(modified) = entry.metadata().and_then(|m| m.modified()) {
+            if newest.as_ref().is_none_or(|(t, _)| modified > *t) {
+                newest = Some((modified, path));
+            }
+        }
+    }
+    newest.map(|(_, p)| p)
 }
 
 fn render_transcript_record(v: &Value) -> Option<String> {
@@ -673,6 +733,27 @@ mod tests {
     fn returns_none_when_every_user_turn_is_a_placeholder() {
         let text = "## User\n\n[Tool result recorded]\n\n## Assistant\n\nok";
         assert_eq!(latest_real_user_message(text), None);
+    }
+
+    #[test]
+    fn discovers_transcript_when_recorded_path_is_wrong() {
+        use std::io::Write as _;
+        let root = tempfile::tempdir().unwrap();
+        let cwd = std::path::Path::new("D:\\projects\\demo");
+        let proj = claude_project_dir_in(root.path(), cwd);
+        fs::create_dir_all(&proj).unwrap();
+        // Older session, then a newer "live" one with a different id.
+        fs::write(proj.join("old-session.jsonl"), b"{}\n").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let live = proj.join("44cf773b.jsonl");
+        let mut f = fs::File::create(&live).unwrap();
+        writeln!(f, "{{}}").unwrap();
+        // The recorded session id matches no file -> fall back to newest.
+        let found = discover_transcript_in(root.path(), cwd, "dc7797d3-missing").unwrap();
+        assert_eq!(found, live);
+        // Exact id match wins over recency.
+        let exact = discover_transcript_in(root.path(), cwd, "old-session").unwrap();
+        assert_eq!(exact.file_stem().unwrap(), "old-session");
     }
 
     #[test]

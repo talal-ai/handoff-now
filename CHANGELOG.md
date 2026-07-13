@@ -4,6 +4,28 @@ All notable changes follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-13
+
+### Fixed
+- Transcript auto-discovery: when the client hands the hook a `transcript_path`
+  that does not exist on disk (observed in the Claude Code desktop app, where
+  the hook's session id can differ from the real transcript filename), the
+  engine now locates the actual transcript under
+  `~/.claude/projects/<encoded-cwd>/*.jsonl` (preferring a session-id match,
+  else the most recent) and records it. Previously this left the handoff with
+  "User Goal: Not recoverable from transcript" and empty history.
+
+### Added
+- On-demand genuine summary: `/handoff-now:now` now writes the deterministic
+  package **and** invokes the `handoff-writer` agent to produce a real narrative
+  `SUMMARY.md`, then promotes it. New `handoff-now promote` verb validates and
+  installs the agent's candidate.
+- The `handoff-writer` agent now reads the full both-sides `CHAT-HISTORY` and is
+  pinned to **Haiku 4.5 on the user's subscription** (no API key) so enrichment
+  costs the least possible against the five-hour limit it is protecting; the
+  deterministic package (zero tokens) remains the recovery guarantee, and no
+  model runs at hard-stop.
+
 ## [0.2.0] - 2026-07-13
 
 ### Fixed

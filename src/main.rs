@@ -68,6 +68,26 @@ fn run() -> Result<()> {
                 .context("no session id")?;
             println!("{}", tail_events(&resolve_out(&id)?, 20));
         }
+        Some("promote") => {
+            // Validate and promote a SUMMARY.candidate.md written by the
+            // handoff-writer agent into the authoritative SUMMARY.md. Lets a
+            // manual `/handoff-now:now` produce a genuine semantic summary on
+            // demand, not only during emergency Stop hooks.
+            let id = args
+                .next()
+                .or_else(latest_session_id)
+                .context("no session id")?;
+            let out = resolve_out(&id)?;
+            let candidate = out.join("SUMMARY.candidate.md");
+            let text = std::fs::read_to_string(&candidate)
+                .with_context(|| format!("read {}", candidate.display()))?;
+            let seq = handoff_now::artifacts::session_json_sequence(&out, 0);
+            handoff_now::artifacts::promote_summary(&out, &text, seq)?;
+            println!(
+                "Semantic summary promoted at {}",
+                out.join("SUMMARY.md").display()
+            );
+        }
         Some("configure") => println!(
             "Edit {} and run `handoff-now doctor`.",
             setup::print_config_path()?.display()
@@ -174,6 +194,7 @@ USAGE:
   handoff-now verify [SESSION_ID]
   handoff-now export [SESSION_ID]
   handoff-now tail [SESSION_ID]
+  handoff-now promote [SESSION_ID]
   handoff-now doctor [--fix]
   handoff-now configure
   handoff-now credential store|delete|status

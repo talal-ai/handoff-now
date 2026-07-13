@@ -1,6 +1,6 @@
 {
   "name": "handoff-now",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Quota-aware, crash-safe handoff packages for Claude Code and Desktop.",
   "author": {
     "name": "talal-ai"

@@ -11,7 +11,7 @@
       "name": "handoff-now",
       "source": "./",
       "description": "Quota-aware, crash-safe handoff packages for Claude Code and Desktop.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "category": "productivity",
       "tags": ["claude-code", "handoff", "session-recovery", "usage-limit", "quota"]
     }
