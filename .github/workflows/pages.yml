@@ -28,7 +28,7 @@ jobs:
           cp assets/logo.svg site/logo.svg
           cp assets/social-preview.png site/social-preview.png
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
       - name: Deploy GitHub Pages
