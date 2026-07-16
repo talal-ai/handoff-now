@@ -41,6 +41,6 @@ jobs:
       - name: Lint shell scripts
         run: shellcheck scripts/bootstrap.sh scripts/hook-dispatch.sh
       - name: Reject accidental secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
